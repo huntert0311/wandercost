@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  free
+  explorer
+  pro
+}
+
+enum VerificationStatus {
+  none
+  pending
+  approved
+  rejected
+}
+
+enum TravelStyle {
+  budget
+  mid_range
+  luxury
+  backpacker
+}
+
+enum TransportMode {
+  flight
+  train
+  bus
+  car
+  boat
+  mixed
+}
+
+enum StayType {
+  hostel
+  hotel
+  airbnb
+  resort
+  camping
+  mixed
+}
+
+model User {
+  id                     String             @id @default(uuid())
+  username               String             @unique
+  email                  String             @unique
+  avatar_url             String?
+  bio                    String?
+  location               String?
+  verified               Boolean            @default(false)
+  verification_status    VerificationStatus @default(none)
+  plan                   Plan               @default(free)
+  stripe_customer_id     String?            @unique
+  stripe_subscription_id String?            @unique
+  followers_count        Int                @default(0)
+  following_count        Int                @default(0)
+  posts_count            Int                @default(0)
+  countries_visited      Int                @default(0)
+  created_at             DateTime           @default(now())
+  updated_at             DateTime           @updatedAt
+
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  saves                Save[]
+  followers            Follow[]             @relation("UserFollowers")
+  following            Follow[]             @relation("UserFollowing")
+  sent_messages        Message[]            @relation("MessageSender")
+  received_messages    Message[]            @relation("MessageReceiver")
+  verification_request VerificationRequest?
+  subscription         Subscription?
+
+  @@map("users")
+}
+
+model Destination {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  country          String
+  continent        String
+  cover_image      String?
+  avg_cost_per_day Float?
+  avg_cost_stay    Float?
+  avg_cost_food    Float?
+  avg_cost_flight  Float?
+  posts_count      Int      @default(0)
+  created_at       DateTime @default(now())
+
+  posts Post[]
+
+  @@map("destinations")
+}
+
+model Post {
+  id               String        @id @default(uuid())
+  user_id          String
+  caption          String
+  location_name    String
+  destination_id   String?
+  photos           String[]
+  cost_per_day     Float?
+  cost_stay        Float?
+  cost_food        Float?
+  cost_transport   Float?
+  cost_activities  Float?
+  cost_flight      Float?
+  cost_total       Float?
+  trip_days        Int?
+  travel_style     TravelStyle?
+  transport_mode   TransportMode?
+  stay_type        StayType?
+  likes_count      Int           @default(0)
+  comments_count   Int           @default(0)
+  saves_count      Int           @default(0)
+  feed_score       Float         @default(0)
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  destination Destination? @relation(fields: [destination_id], references: [id])
+  comments    Comment[]
+  likes       Like[]
+  saves       Save[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id                String   @id @default(uuid())
+  post_id           String
+  user_id           String
+  parent_comment_id String?
+  body              String
+  likes_count       Int      @default(0)
+  created_at        DateTime @default(now())
+
+  post    Post      @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+model Like {
+  id         String   @id @default(uuid())
+  post_id    String
+  user_id    String
+  created_at DateTime @default(now())
+
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, user_id])
+  @@map("likes")
+}
+
+model Save {
+  id         String   @id @default(uuid())
+  post_id    String
+  user_id    String
+  created_at DateTime @default(now())
+
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, user_id])
+  @@map("saves")
+}
+
+model Follow {
+  id           String   @id @default(uuid())
+  follower_id  String
+  following_id String
+  created_at   DateTime @default(now())
+
+  follower  User @relation("UserFollowing", fields: [follower_id], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [following_id], references: [id], onDelete: Cascade)
+
+  @@unique([follower_id, following_id])
+  @@map("follows")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  sender_id   String
+  receiver_id String
+  body        String
+  read        Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  sender   User @relation("MessageSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model VerificationRequest {
+  id                String             @id @default(uuid())
+  user_id           String             @unique
+  id_photo_url      String
+  selfie_url        String
+  trip_proof_url    String
+  status            VerificationStatus @default(pending)
+  admin_notes       String?
+  submitted_at      DateTime           @default(now())
+  reviewed_at       DateTime?
+  id_deleted_at     DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("verification_requests")
+}
+
+model Subscription {
+  id                   String   @id @default(uuid())
+  user_id              String   @unique
+  stripe_subscription_id String @unique
+  plan                 Plan
+  status               String
+  current_period_start DateTime
+  current_period_end   DateTime
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}

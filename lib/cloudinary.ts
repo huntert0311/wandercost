@@ -8,5 +8,4 @@ cloudinary.config({
 
 export { cloudinary };
 
-export const CLOUDINARY_UPLOAD_PRESET = "wandercost_posts";
-export const MAX_PHOTOS_PER_POST = 4;
+export { CLOUDINARY_UPLOAD_PRESET, MAX_PHOTOS_PER_POST } from "./cloudinary-config";
